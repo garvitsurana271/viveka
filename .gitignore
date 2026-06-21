@@ -1,0 +1,41 @@
+# Secrets — never commit
+backend/.env
+.env
+.env.local
+
+# Python
+backend/.venv/
+__pycache__/
+*.pyc
+
+# Learned data + eval cache (regenerated; may contain injected/learned content)
+backend/data/antibodies.json
+backend/eval/cache/
+backend/eval/reports/
+
+# Node / build
+frontend/node_modules/
+frontend/dist/
+node_modules/
+
+# Tooling
+.playwright-mcp/
+design-export/
+
+# Video project — the demo video lives on YouTube, keep the repo to product code
+videos/
+*.mp4
+renders/
+snapshots/
+_frames/
+
+# Internal build / submission notes — not for the public repo
+DESIGN-BRIEF.md
+DEVPOST-FORM-READY.md
+DEVPOST-SUBMISSION.md
+DEMO-SCRIPT.md
+IMPROVEMENTS.md
+docs/
+
+# AVeriTeC dataset (CC BY-NC; download from the official source, do not redistribute)
+backend/eval/data/

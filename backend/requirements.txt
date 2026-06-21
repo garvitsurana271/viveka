@@ -1,0 +1,25 @@
+# Viveka backend — all free-tier / open-source
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+pydantic==2.10.2
+httpx==0.28.1
+python-dotenv==1.0.1
+
+# LLM provider — current unified Google SDK (free tier: gemini-2.5-flash / -flash-lite).
+# The old `google-generativeai` package is deprecated; this replaces it.
+google-genai==1.0.0
+
+# Optional drop-in providers (lazy-imported; only needed if selected)
+# anthropic>=0.40.0   # Claude, if a funded key is available
+# groq>=0.11.0        # fast free text sidecar
+
+# Retrieval/evidence — free, keyless:
+#   httpx against Wikipedia REST + Google Fact Check Tools, plus...
+ddgs==9.14.4        # free web search (DuckDuckGo/Bing/Google), no API key
+trafilatura==2.1.0  # full-document extraction (the biggest accuracy lever; fetch.py)
+rank-bm25==0.2.2    # dynamic in-context exemplars / nearest checked claims (fewshot.py)
+pillow==12.2.0      # image handling for the multimodal (Gemma vision) path
+# Voice is transcribed in the browser (Web Speech API) — no server-side ASR.
+# NOTE: trafilatura + rank-bm25 are REQUIRED for the benchmarked engine. Without
+# trafilatura, retrieval degrades to snippets (no full-doc); without rank-bm25, the
+# dynamic exemplars fall back off — i.e. the 0.733 recipe silently drops to ~0.700.

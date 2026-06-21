@@ -1,0 +1,25 @@
+# Render free-tier deploy for the Viveka engine (FastAPI).
+# Create a Render account -> New -> Blueprint -> point at this repo.
+# Set the secret env vars (sync:false) in the Render dashboard after first deploy.
+services:
+  - type: web
+    name: viveka-engine
+    runtime: python
+    rootDir: backend
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false              # your Google AI Studio key
+      - key: VIVEKA_GEMINI_MODEL
+        value: gemma-4-31b-it
+      - key: GOOGLE_FACTCHECK_API_KEY
+        sync: false              # optional; engine still runs without it
+      - key: WHATSAPP_TOKEN
+        sync: false              # optional; only for the WhatsApp last-mile
+      - key: WHATSAPP_PHONE_ID
+        sync: false
+      - key: WHATSAPP_VERIFY_TOKEN
+        value: viveka-verify
