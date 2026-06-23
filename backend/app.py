@@ -12,27 +12,45 @@ import engine
 
 app = FastAPI(title="Viveka engine", version="0.1.0")
 
-# Per-IP rate limit on the cost-bearing endpoint, so one client can't drain the
-# free Gemma quota (1500/day) and take the public demo dark. Generous enough that
-# real use never hits it; an in-memory sliding window (good for a single instance).
-_RL_MAX, _RL_WINDOW = 20, 60.0
-_rl_hits: dict[str, deque] = defaultdict(deque)
+# --- Quota protection for the public demo -------------------------------------
+# /api/check is the only endpoint that can spend the free Gemma quota (~1500/day),
+# so it is guarded three ways: per-IP burst, per-IP per day, and a whole-demo daily
+# cap (the real quota guard — even many IPs cannot drain it). All in-memory, fine for
+# a single free-tier instance; counters reset on restart and at UTC midnight. Tune
+# any of them via env vars on Render (RL_PER_MIN / RL_PER_DAY / RL_GLOBAL_DAY) with
+# no code change.
+import os
+_RL_PER_MIN    = int(os.getenv("RL_PER_MIN", "6"))       # per-IP, sliding 60s
+_RL_PER_DAY    = int(os.getenv("RL_PER_DAY", "20"))      # per-IP, per UTC day
+_RL_GLOBAL_DAY = int(os.getenv("RL_GLOBAL_DAY", "400"))   # whole demo, per UTC day
+
+_rl_min: dict[str, deque] = defaultdict(deque)   # per-IP recent timestamps
+_rl_day: dict[str, int] = defaultdict(int)       # per-IP count today
+_rl_global = {"day": "", "n": 0}                 # whole-demo count today
 
 
 @app.middleware("http")
 async def _rate_limit(request: Request, call_next):
     if request.url.path == "/api/check":
-        # Behind a proxy (Render/Vercel) request.client.host is the proxy IP and would
-        # put every visitor in one bucket — use the real client from X-Forwarded-For.
+        # Behind Render's proxy, request.client.host is the proxy IP and would put every
+        # visitor in one bucket — use the real client from X-Forwarded-For.
         xff = request.headers.get("x-forwarded-for", "")
         ip = xff.split(",")[0].strip() if xff else (request.client.host if request.client else "?")
         now = time.monotonic()
-        q = _rl_hits[ip]
-        while q and now - q[0] > _RL_WINDOW:
+        day = time.strftime("%Y-%m-%d", time.gmtime())
+        if _rl_global["day"] != day:                 # new UTC day -> reset the daily counters
+            _rl_global["day"], _rl_global["n"] = day, 0
+            _rl_day.clear(); _rl_min.clear()
+        q = _rl_min[ip]
+        while q and now - q[0] > 60.0:
             q.popleft()
-        if len(q) >= _RL_MAX:
-            return JSONResponse({"detail": "Too many checks — please slow down a moment."}, status_code=429)
-        q.append(now)
+        if len(q) >= _RL_PER_MIN:
+            return JSONResponse({"detail": "Too many checks in a minute — please slow down a moment."}, status_code=429)
+        if _rl_day[ip] >= _RL_PER_DAY:
+            return JSONResponse({"detail": "You've reached today's limit for this live demo. Try again tomorrow, or watch the demo video."}, status_code=429)
+        if _rl_global["n"] >= _RL_GLOBAL_DAY:
+            return JSONResponse({"detail": "The live demo has hit its daily limit (protecting a free-tier quota). Please try again tomorrow."}, status_code=429)
+        q.append(now); _rl_day[ip] += 1; _rl_global["n"] += 1
     return await call_next(request)
 
 # Demo: allow any origin (the SPA may be on Vercel, localhost, etc.).
