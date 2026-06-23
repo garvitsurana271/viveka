@@ -118,18 +118,25 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 _DIST = os.path.join(os.path.dirname(__file__), "static")
-if os.path.isdir(_DIST):
+_INDEX = os.path.join(_DIST, "index.html")
+if os.path.isfile(_INDEX):
     _assets = os.path.join(_DIST, "assets")
     if os.path.isdir(_assets):
+        # Starlette's StaticFiles resolves and confines paths to the directory, so
+        # the built JS/CSS is served with no path-traversal surface.
         app.mount("/assets", StaticFiles(directory=_assets), name="assets")
+
+    @app.get("/favicon.svg")
+    def _favicon():
+        return FileResponse(os.path.join(_DIST, "favicon.svg"))
 
     @app.get("/")
     def _spa_index():
-        return FileResponse(os.path.join(_DIST, "index.html"))
+        return FileResponse(_INDEX)
 
+    # SPA catch-all: every other GET returns the app shell. Crucially, NO request
+    # input is ever joined to a filesystem path here, so there is no path traversal
+    # (a request like /../../config.py just returns index.html).
     @app.get("/{full_path:path}")
     def _spa_fallback(full_path: str):
-        f = os.path.join(_DIST, full_path)
-        if os.path.isfile(f):
-            return FileResponse(f)
-        return FileResponse(os.path.join(_DIST, "index.html"))
+        return FileResponse(_INDEX)
