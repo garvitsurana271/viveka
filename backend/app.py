@@ -107,3 +107,29 @@ async def check(inp: CheckIn):
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+# --- Serve the built SPA so one service hosts the whole product ----------------
+# The frontend is pre-built into backend/static (committed), so the engine serves
+# both the UI and the /api routes from a single origin. Registered LAST, so every
+# /api and /webhook route above is matched first; the catch-all only handles GET.
+import os
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+
+_DIST = os.path.join(os.path.dirname(__file__), "static")
+if os.path.isdir(_DIST):
+    _assets = os.path.join(_DIST, "assets")
+    if os.path.isdir(_assets):
+        app.mount("/assets", StaticFiles(directory=_assets), name="assets")
+
+    @app.get("/")
+    def _spa_index():
+        return FileResponse(os.path.join(_DIST, "index.html"))
+
+    @app.get("/{full_path:path}")
+    def _spa_fallback(full_path: str):
+        f = os.path.join(_DIST, full_path)
+        if os.path.isfile(f):
+            return FileResponse(f)
+        return FileResponse(os.path.join(_DIST, "index.html"))
